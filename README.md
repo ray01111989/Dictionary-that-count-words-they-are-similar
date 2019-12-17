@@ -1,1 +1,2 @@
 # Dictionary-that-count-words-they-are-similar
+//This program should first of all change all characters to uppercase letters then get rid of all the white spaces like tabs, new line, and multiple spaces. after that it should get phrases as defined after every seperator it is consedered a s phrase.Then it will save it to a dictionary and start looking for similar phrases and every time it finds one it will increment the counter but if its a new phrase it will just add it to the dictionary. lastly it will sort the dictionary according to the phrase's length.
