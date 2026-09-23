@@ -2,32 +2,51 @@
 //Name: Rawad Bader
 //Date: 11/14/2018
 //Class: CSE224
-//This program should first of all change all characters to uppercase letters then get rid of all the white spaces like tabs, new line, and multiple spaces. after that it should get phrases as defined after every seperator it is consedered a s phrase.Then it will save it to a dictionary and start looking for similar phrases and every time it finds one it will increment the counter but if its a new phrase it will just add it to the dictionary. lastly it will sort the dictionary according to the phrase's length.
+//This program reads text from standard input and counts how many times each phrase appears.
+//Steps: it changes every letter to uppercase, ignores the characters ( ) ' " -, turns tabs and new lines into
+//spaces, and collapses runs of spaces into a single space. A phrase ends at any separator (, . ; : ? !).
+//Each phrase is saved in a dictionary; when the same phrase appears again its counter goes up, and a new
+//phrase is added with a counter of 1. Finally the dictionary is sorted by phrase length (shortest first)
+//and printed.
+//
+//Build:  gcc -Wall -o p4 p4.c
+//Run:    ./p4 < input.txt
 #include <stdio.h>
 #include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
-int getupperchar() //converts lower case letters to uppercase letters
+
+#define PHRASE_MAX 201   // longest phrase we store, including the ending '\0'
+#define DICT_SIZE 1000   // most different phrases the dictionary can hold
+
+// Reads one character from standard input and converts it to uppercase (EOF is passed through unchanged)
+int getupperchar()
 {
 	int c = getchar();
 	c = toupper(c);
 	return c;
 }
-bool isWhiteSpace(int c)// converts TABS and new lines and spaces to just one space
+
+// Returns true for the characters that count as white space: tab, new line, and space
+bool isWhiteSpace(int c)
 {
 	if (c=='\n' || c=='\t'|| c==' ')
 		return true;
 	else
 		return false;
 }
-bool ShouldIgnore(int c)// ignores the characters [ (,),',",- ]
+
+// Returns true for the characters that are dropped from the text: ( ) ' " -
+bool ShouldIgnore(int c)
 {
 	if (c=='(' || c==')' || c=='\'' || c=='\"' || c=='-')
 		return true;
 	else
 		return false;
 }
-int isSeperator(int c)//seperates phrases if it had these characters [ , . : ; ? ! ]
+
+// Returns true for the characters that end a phrase: , . ; : ? !
+int isSeperator(int c)
 {
 	if (c==',' || c=='.' || c==';' || c==':' || c=='?' || c=='!')
 		return true;
@@ -35,93 +54,115 @@ int isSeperator(int c)//seperates phrases if it had these characters [ , . : ; ?
 		return false;
 }
 
-int getinput()// gets the strings uppercased, without white spaces, and after it ignores the charaters that it should
+// Gets the next usable character: uppercased, skipping ignored characters, with any white space turned into a space
+int getinput()
 {
-	int c =  getupperchar();
-	if(c==EOF)
-		return c;
-
+	int c = getupperchar();
+	// Keep reading while the character is one we ignore (a loop instead of recursion, so a very long run of
+	// ignored characters cannot overflow the stack)
+	while (c != EOF && ShouldIgnore(c) == true)
+		c = getupperchar();
 	if (isWhiteSpace(c) == true){
 		c = ' ';
 	}
-	if (ShouldIgnore(c) == true){
-		c = getinput();
-	}
 	return c;
 }
-int getPhrase(char *str, int length) // gets phrases after every tim it finds a seperator and stores it as a phrase
+
+// Reads one phrase into str (which must hold at least length characters) and returns the character that ended it
+// (a separator, or EOF). Leading and trailing spaces are removed and runs of spaces become a single space.
+int getPhrase(char *str, int length)
 {
 	int c=getinput();
+	// Skip spaces at the start of the phrase
 	while (isWhiteSpace(c))
 		c=getinput();
 
 	int i=0;
 	while (!isSeperator(c) && c != EOF){
-		if (i< length){
+		// Keep one slot free for the ending '\0'. Skip a space that follows another space.
+		if (i < length - 1 && !(c == ' ' && i > 0 && str[i-1] == ' ')){
 			str[i] = c;
 			i++;
 		}
 		c=getinput();
 	}
+	// Remove a space left at the end of the phrase
+	if (i > 0 && str[i-1] == ' ')
+		i--;
 	str[i] = '\0';
 	return c;
 }
 
-char dict[1000][201] = {'\0'};// making every space equall to \0
-int count[1000] = {0};
-int dictlen=1000;
-int insert(char *str)// insert function looks for a place where it has \0 means it dosnt have a string in it and coppies the sting into it. if the string was similar to a previous one it would add 1 to the counter.
+char dict[DICT_SIZE][PHRASE_MAX] = {{'\0'}};// the phrases; an empty string ('\0' first) means the slot is unused
+int count[DICT_SIZE] = {0};                 // count[i] is how many times dict[i] has been seen
+int dictlen=DICT_SIZE;
 
+// Adds a phrase to the dictionary. If it is already there its counter goes up by one; otherwise it is copied
+// into the first empty slot with a counter of 1. Returns the slot used, or -1 if the dictionary is full.
+int insert(char *str)
 {
 	int i;
 	for (i = 0 ; i< dictlen; i++){
-		if(dict[i][0]=='\0'){
+		if(dict[i][0]=='\0'){          // found an empty slot: store the new phrase here
 			strcpy(dict[i],str);
 			count[i]++;
 			return i;
 		}
-		if (strcmp(str,dict[i])==0){
+		if (strcmp(str,dict[i])==0){   // found the same phrase: just count it again
 			count[i]++;
 			return i;
 		}
 	}
-	return 0;
+	fprintf(stderr, "Dictionary is full; the phrase <%s> was not counted\n", str);
+	return -1;
 }
-void sort()// sort function would compare the strings length to the one after it and swaps places it if it is longer.
+
+// Sorts the dictionary by phrase length, shortest first (bubble sort: keep swapping neighbours that are out of order)
+void sort()
 {
 int i;
 int c=1;
-	while(c>0){					// while loop will keep sorting untill there is no more strings to sort.
+	while(c>0){					// repeat until a full pass makes no swaps
 	c=0;
 	for (i=0; i<dictlen-1 && count[i+1]>0; i++){
 		if (strlen(dict[i])>strlen(dict[i+1])){
-		//	printf("%s > %s\n",dict[i],dict[i+1]);
-			char temp[201];
+			char temp[PHRASE_MAX];
 			int t;
-			strcpy(temp,dict[i]);// this is to swap the strings.
+			strcpy(temp,dict[i]);       // swap the two phrases...
 			t=count[i];
 			strcpy(dict[i],dict[i+1]);
 			count[i]=count[i+1];
 			strcpy(dict[i+1],temp);
-			count[i+1]=t;
+			count[i+1]=t;               // ...and their counters
 			c++;
 		}
 	}
 	}
 }
+
+// Prints every phrase that was counted, as a 5-digit count followed by the phrase in <angle brackets>
 void print(){
 	int i;
 	for (i=0; i<dictlen; i++){
 	if (count[i]>0)
-		printf("%05d <%s>\n",count[i],dict[i]);	//this will print five places for the counter and the dictionary.
+		printf("%05d <%s>\n",count[i],dict[i]);
 	}
 }
+
 int main(void){
 	int c;
-	char s[201];
+	char s[PHRASE_MAX] = "";
 
-	while ((c=getPhrase(s,201)) != EOF) {
-		insert(s);
+	// Read phrase after phrase until the input ends, adding each one to the dictionary.
+	// Empty phrases (for example from ",,") are skipped: an empty string looks like an empty dictionary slot.
+	while ((c=getPhrase(s,PHRASE_MAX)) != EOF) {
+		if (s[0] != '\0')
+			insert(s);
 	}
+	// The last phrase may end at the end of the input instead of a separator; count it if it is not empty
+	if (s[0] != '\0')
+		insert(s);
 	sort();
-	print
+	print();
+	return 0;
+}
